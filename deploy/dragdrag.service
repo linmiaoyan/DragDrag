@@ -1,0 +1,24 @@
+# /etc/systemd/system/dragdrag.service
+#
+# 部署时按实际情况改 WorkingDirectory / ExecStart 里的路径。
+# 管理员口令用下面二选一（不要写进代码，也不要提交）：
+#   a) 在 [Service] 里加  Environment=DRAGDRAG_ADMIN_PASSWORD=<口令>
+#   b) 在 WorkingDirectory 下放 .admin_password 文件，chmod 600
+# 改完：sudo systemctl daemon-reload && sudo systemctl restart dragdrag
+
+[Unit]
+Description=dragdrag file service (python)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/dragdrag
+ExecStart=/usr/bin/python3 /home/ubuntu/dragdrag/drag.py
+Restart=always
+RestartSec=2
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

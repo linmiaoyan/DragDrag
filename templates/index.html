@@ -225,15 +225,268 @@
             color: #9ca3af;
             font-size: 14px;
         }
+
+        /* 管理员密码弹窗：只有「临时」组以外的删除才会出现。
+           用自定义 modal 而不是 prompt()，密码输入框是遮蔽的。 */
+        #pwd-mask[hidden] { display: none; }
+        #pwd-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(2px);
+        }
+        .pwd-panel {
+            width: min(420px, calc(100vw - 48px));
+            background: #fff;
+            border-radius: 14px;
+            padding: 22px 24px 18px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+            font-family: inherit;
+        }
+        .pwd-panel h3 {
+            margin: 0 0 6px;
+            font-size: 16px;
+            color: #111827;
+        }
+        .pwd-panel .pwd-hint {
+            margin: 0 0 14px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #6b7280;
+        }
+        .pwd-panel input[type="password"] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            font-size: 15px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color .15s;
+        }
+        .pwd-panel input[type="password"]:focus { border-color: #3b82f6; }
+        .pwd-panel .pwd-err {
+            min-height: 18px;
+            margin: 6px 0 0;
+            font-size: 12px;
+            color: #dc2626;
+        }
+        .pwd-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .pwd-actions button {
+            padding: 8px 18px;
+            font-size: 14px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+        #pwd-cancel { background: #e5e7eb; color: #374151; }
+        #pwd-cancel:hover { background: #d1d5db; }
+        #pwd-ok { background: #2563eb; color: #fff; }
+        #pwd-ok:hover { background: #1d4ed8; }
+
+        /* ── 共享剪贴板（页面最上方） ───────────────────────────── */
+        .clip-card {
+            max-width: 900px;
+            margin: 0 auto 22px auto;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 16px 18px 14px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, .05);
+        }
+        .clip-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .clip-title {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .clip-title strong { font-size: 16px; color: #111827; }
+        .clip-sub { font-size: 12px; color: #9ca3af; }
+        .clip-count { font-size: 12px; color: #6b7280; }
+        .clip-compose {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+        }
+        .clip-compose textarea {
+            flex: 1 1 auto;
+            min-height: 54px;
+            max-height: 180px;
+            resize: vertical;
+            padding: 10px 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            font-family: inherit;
+            color: #111827;
+            background: #fff;
+            border: 1.5px solid #d1d5db;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color .15s;
+        }
+        .clip-compose textarea:focus { border-color: #3b82f6; }
+        .clip-add {
+            flex: 0 0 auto;
+            padding: 0 18px;
+            border: none;
+            border-radius: 10px;
+            background: #2563eb;
+            color: #fff;
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .clip-add:hover { background: #1d4ed8; }
+        .clip-add:disabled { background: #93c5fd; cursor: not-allowed; }
+        .clip-list {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .clip-item {
+            background: #f8fafc;
+            border: 1px solid #eef2f7;
+            border-radius: 10px;
+            padding: 8px 12px 10px;
+        }
+        .clip-item-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+            min-height: 22px;
+        }
+        .clip-time { font-size: 11.5px; color: #9ca3af; }
+        .clip-item-actions {
+            display: flex;
+            gap: 6px;
+            opacity: .5;
+            transition: opacity .15s;
+        }
+        .clip-item:hover .clip-item-actions { opacity: 1; }
+        .clip-btn {
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #475569;
+            font-size: 12px;
+            font-family: inherit;
+            padding: 3px 9px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .clip-btn:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+        .clip-btn.danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+        .clip-btn.armed { background: #dc2626; border-color: #dc2626; color: #fff; }
+        .clip-text {
+            font-size: 13.5px;
+            line-height: 1.62;
+            color: #1f2937;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 150px;
+            overflow: auto;
+        }
+        .clip-edit-area {
+            width: 100%;
+            box-sizing: border-box;
+            resize: vertical;
+            padding: 8px 10px;
+            font-size: 13.5px;
+            line-height: 1.6;
+            font-family: inherit;
+            color: #111827;
+            border: 1.5px solid #3b82f6;
+            border-radius: 8px;
+            outline: none;
+        }
+        .clip-edit-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .clip-empty {
+            margin: 10px 0 2px;
+            font-size: 13px;
+            color: #9ca3af;
+            text-align: center;
+        }
+        .clip-msg {
+            margin: 8px 0 0;
+            font-size: 12.5px;
+            color: #b91c1c;
+            min-height: 0;
+        }
+        @media (max-width: 640px) {
+            /* 手机上加卡片的顺带修一个老问题：body 40px 边距 + #drop-area 的
+               width:100% 和 40px padding 是 content-box，页面会横向溢出 44px */
+            body { margin: 16px; }
+            #drop-area { box-sizing: border-box; padding: 24px 14px; }
+            .clip-compose { flex-direction: column; }
+            .clip-add { padding: 10px 18px; }
+        }
     </style>
 </head>
 <body>
+    <!-- 共享剪贴板：整块放在最上方，谁都能加/改/删，过期自动清 -->
+    <section class="clip-card" id="clip-card">
+        <div class="clip-head">
+            <div class="clip-title">
+                <strong>📋 共享剪贴板</strong>
+                <span class="clip-sub">谁都能改 · <span id="clip-ttl">24</span> 小时后自动清掉</span>
+            </div>
+            <span class="clip-count" id="clip-count"></span>
+        </div>
+        <div class="clip-compose">
+            <textarea id="clip-new" rows="2" maxlength="4000" placeholder="贴一段文本进来，Ctrl+Enter 直接放入（整个局域网可见，别放隐私内容）"></textarea>
+            <button class="clip-add" id="clip-add" type="button">放入剪贴板</button>
+        </div>
+        <p class="clip-msg" id="clip-msg"></p>
+        <p class="clip-empty" id="clip-empty">还没有内容，贴第一段吧。</p>
+        <div class="clip-list" id="clip-list"></div>
+    </section>
+
     <h2>局域网文件传输</h2>
     <div id="drop-area">
         <p>拖拽文件到此处上传，或 <input type="file" id="fileElem" multiple style="display:none" onchange="handleFiles(this.files)"><button onclick="document.getElementById('fileElem').click()">选择文件</button></p>
     </div>
     <div id="sections-container" class="section-container"></div>
     <div id="upload-progress"></div>
+
+    <!-- 管理员密码弹窗（管理员密码只在提交时用，不写在页面里） -->
+    <div id="pwd-mask" hidden>
+        <div class="pwd-panel">
+            <h3>需要管理员密码</h3>
+            <p class="pwd-hint" id="pwd-hint"></p>
+            <input type="password" id="pwd-input" autocomplete="off" placeholder="请输入管理员密码">
+            <p class="pwd-err" id="pwd-err"></p>
+            <div class="pwd-actions">
+                <button id="pwd-cancel" type="button">取消</button>
+                <button id="pwd-ok" type="button">确定</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 存储分区数据
         let sections = [];
@@ -471,23 +724,92 @@
             saveSectionsToServer();
         }
         
-        // 删除分区
-        function deleteSection(sectionId) {
-            if (!confirm('确定要删除此分区吗？分区内的所有文件将移至默认分区。')) return;
-            
-            const sectionIndex = sections.findIndex(s => s.id === sectionId);
-            if (sectionIndex !== -1) {
-                // 将文件移至默认分区
-                const filesToMove = sections[sectionIndex].files;
-                const defaultSection = sections.find(s => s.id === 'default');
-                if (defaultSection) {
-                    defaultSection.files = [...defaultSection.files, ...filesToMove];
+        // 弹出管理员密码框，返回 Promise<string | null>（null 表示用户取消）
+        // 密码只在这里收集、直接提交给后端比对，页面里不存任何明文。
+        function askAdminPassword(hint) {
+            return new Promise(resolve => {
+                const mask = document.getElementById('pwd-mask');
+                const input = document.getElementById('pwd-input');
+                const hintEl = document.getElementById('pwd-hint');
+                const errEl = document.getElementById('pwd-err');
+                const okBtn = document.getElementById('pwd-ok');
+                const cancelBtn = document.getElementById('pwd-cancel');
+
+                hintEl.textContent = hint || '';
+                errEl.textContent = '';
+                input.value = '';
+                mask.hidden = false;
+                setTimeout(() => input.focus(), 20);
+
+                function cleanup(value) {
+                    mask.hidden = true;
+                    input.value = '';   // 关闭即清空，明文密码不留在 DOM 里
+                    okBtn.onclick = null;
+                    cancelBtn.onclick = null;
+                    input.onkeydown = null;
+                    mask.onclick = null;
+                    resolve(value);
                 }
-                
-                // 删除分区
-                sections.splice(sectionIndex, 1);
+
+                function submit() {
+                    const v = input.value;
+                    if (!v) {
+                        errEl.textContent = '请输入密码';
+                        input.focus();
+                        return;
+                    }
+                    cleanup(v);
+                }
+
+                okBtn.onclick = submit;
+                cancelBtn.onclick = () => cleanup(null);
+                mask.onclick = (e) => { if (e.target === mask) cleanup(null); };
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); cleanup(null); }
+                    else { errEl.textContent = ''; }
+                };
+            });
+        }
+
+        // 「临时」组 = 默认分区，删除免密
+        function isTempSection(sectionId) {
+            return sectionId === 'default';
+        }
+
+        // 删除分区（「临时」以外都要管理员密码）
+        async function deleteSection(sectionId) {
+            const section = sections.find(s => s.id === sectionId);
+            if (!section) return;
+            if (!confirm(`确定要删除分区「${section.name}」吗？分区内的文件将移到临时组。`)) return;
+
+            const password = await askAdminPassword(
+                `分区「${section.name}」不是临时组，删除需要管理员密码。`
+            );
+            if (password === null) return;   // 用户取消
+
+            const snapshot = JSON.parse(JSON.stringify(sections));
+
+            // 先把文件挪到临时组，再移除分区（与服务端语义一致）
+            const filesToMove = section.files.slice();
+            const defaultSection = sections.find(s => s.id === 'default');
+            if (defaultSection) {
+                defaultSection.files = [...defaultSection.files, ...filesToMove];
+            }
+            sections = sections.filter(s => s.id !== sectionId);
+            renderSections();
+
+            try {
+                await saveSectionsToServer(password);
+            } catch (err) {
+                // 密码错 / 保存失败：整体回滚，别让界面和服务端对不上
+                sections = snapshot;
                 renderSections();
-                saveSectionsToServer();
+                if (err.code === 403) {
+                    alert((err.detail || '管理员密码错误') + '，分区未删除。');
+                } else {
+                    alert('保存失败，分区未删除。');
+                }
             }
         }
         
@@ -595,22 +917,47 @@
             return tile;
         }
         
-        // 从分区删除文件
-        function deleteFileFromSection(fileName, sectionId) {
-            if (!confirm('确定要删除此文件吗？')) return;
-            
-            fetch(`/delete/${encodeURIComponent(fileName)}`, { method: 'POST' }).then(r => {
+        // 从分区删除文件（「临时」以外都要管理员密码）
+        async function deleteFileFromSection(fileName, sectionId) {
+            const section = sections.find(s => s.id === sectionId);
+            const isTemp = isTempSection(sectionId);
+
+            if (!confirm(`确定要删除「${fileName}」吗？`)) return;
+
+            let password = null;
+            if (!isTemp) {
+                password = await askAdminPassword(
+                    `「${section ? section.name : sectionId}」不是临时组，删除文件需要管理员密码。`
+                );
+                if (password === null) return;   // 用户取消
+            }
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (password) headers['X-Admin-Password'] = password;
+
+            fetch(`/delete/${encodeURIComponent(fileName)}`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ sectionId: sectionId, password: password || '' })
+            }).then(async r => {
                 if (r.ok) {
                     // 从分区中移除文件
-                    const section = sections.find(s => s.id === sectionId);
-                    if (section) {
-                        section.files = section.files.filter(f => f !== fileName);
+                    const sec = sections.find(s => s.id === sectionId);
+                    if (sec) {
+                        sec.files = sec.files.filter(f => f !== fileName);
                         renderSections();
                         saveSectionsToServer();
                     }
+                } else if (r.status === 403) {
+                    let msg = '管理员密码错误';
+                    try { msg = (await r.json()).message || msg; } catch (e) {}
+                    alert(msg + '，文件未删除。');
                 } else {
                     alert('删除失败');
                 }
+            }).catch(err => {
+                console.error('删除出错:', err);
+                alert('删除失败：网络错误');
             });
         }
 
@@ -686,20 +1033,29 @@
         }
         
         // 保存分区状态到后端API
-        function saveSectionsToServer() {
-            fetch('/sections', {
+        // password 只在「删除分区」时传；拖拽/新建/重命名等普通保存不带密码，也不会被拦。
+        function saveSectionsToServer(password) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (password) headers['X-Admin-Password'] = password;
+
+            const p = fetch('/sections', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
                 body: JSON.stringify(sections)
-            }).then(response => {
-                if (!response.ok) {
-                    console.error('保存分区数据失败');
+            }).then(async response => {
+                if (response.status === 403) {
+                    const err = new Error('PASSWORD_REQUIRED');
+                    err.code = 403;
+                    try { err.detail = (await response.json()).message; } catch (e) {}
+                    throw err;
                 }
-            }).catch(error => {
-                console.error('保存分区数据出错:', error);
+                if (!response.ok) throw new Error('保存分区数据失败: HTTP ' + response.status);
+                return true;
             });
+
+            // 普通保存没有调用方接错误，这里兜住，避免 unhandled rejection
+            if (!password) p.catch(err => console.error('保存分区数据失败:', err));
+            return p;
         }
         
         // 从后端API加载分区状态
@@ -787,6 +1143,279 @@
             // 刷新文件列表
             refreshFileList();
         };
+    </script>
+
+    <!-- ── 共享剪贴板 ────────────────────────────────────────────────
+         存的是 JSON，一切用户文本只用 textContent 写进 DOM（不用 innerHTML），
+         否则别人贴一段 <img onerror=...> 就能在这页上执行脚本。
+    ─────────────────────────────────────────────────────────────── -->
+    <script>
+    (function () {
+        'use strict';
+
+        var listEl   = document.getElementById('clip-list');
+        var emptyEl  = document.getElementById('clip-empty');
+        var countEl  = document.getElementById('clip-count');
+        var ttlEl    = document.getElementById('clip-ttl');
+        var msgEl    = document.getElementById('clip-msg');
+        var newEl    = document.getElementById('clip-new');
+        var addBtn   = document.getElementById('clip-add');
+
+        var items = [];
+        var editingId = null;     // 正在编辑的条目：轮询时不许重绘，否则输入框会被冲掉
+        var busyAdd = false;
+
+        function el(tag, cls, text) {
+            var n = document.createElement(tag);
+            if (cls) n.className = cls;
+            if (text != null) n.textContent = text;
+            return n;
+        }
+
+        function ago(ts) {
+            var s = Math.max(0, Math.floor(Date.now() / 1000) - (ts || 0));
+            if (s < 60) return '刚刚';
+            if (s < 3600) return Math.floor(s / 60) + ' 分钟前';
+            if (s < 86400) return Math.floor(s / 3600) + ' 小时前';
+            var d = new Date((ts || 0) * 1000);
+            var p = function (n) { return String(n).padStart(2, '0'); };
+            return (d.getMonth() + 1) + '-' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+        }
+
+        function setMsg(text) {
+            msgEl.textContent = text || '';
+        }
+
+        function api(url, opts) {
+            var o = Object.assign({ cache: 'no-store', headers: { 'Content-Type': 'application/json' } }, opts || {});
+            return fetch(url, o).then(function (r) {
+                return r.text().then(function (t) {
+                    var data = null;
+                    try { data = t ? JSON.parse(t) : null; } catch (e) { data = null; }
+                    if (!r.ok) {
+                        var m = (data && data.message) || ('请求失败（HTTP ' + r.status + '）');
+                        throw new Error(m);
+                    }
+                    return data || {};
+                });
+            });
+        }
+
+        // ---------- 复制（http 页面没有 navigator.clipboard，得留老办法） ----------
+        function copyText(text, btn, textEl) {
+            var done = function (ok) {
+                if (ok) {
+                    btn.textContent = '已复制';
+                    setTimeout(function () { btn.textContent = '复制'; }, 1200);
+                    return;
+                }
+                // 两种办法都失败（有些浏览器就是要真手势）：把文本选中，
+                // 用户按一下 Ctrl+C 就行，总比干瞪一个「复制失败」强
+                try {
+                    var range = document.createRange();
+                    range.selectNodeContents(textEl);
+                    var sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    btn.textContent = '已选中，按 Ctrl+C';
+                } catch (e) {
+                    btn.textContent = '复制失败';
+                }
+                setTimeout(function () { btn.textContent = '复制'; }, 2600);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(function () { done(true); },
+                                                          function () { done(legacyCopy(text)); });
+                return;
+            }
+            done(legacyCopy(text));
+        }
+
+        function legacyCopy(text) {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.top = '-1000px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            ta.setSelectionRange(0, ta.value.length);
+            var ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            document.body.removeChild(ta);
+            return ok;
+        }
+
+        // ---------- 渲染 ----------
+        function render() {
+            countEl.textContent = items.length ? (items.length + ' 条') : '';
+            emptyEl.hidden = items.length > 0;
+            if (editingId) return;          // 编辑中：保持现有 DOM 不动
+            listEl.textContent = '';
+            items.forEach(function (it) { listEl.appendChild(rowOf(it)); });
+        }
+
+        function rowOf(it) {
+            var row = el('div', 'clip-item');
+            row.dataset.id = it.id;
+
+            var head = el('div', 'clip-item-head');
+            var time = el('span', 'clip-time', ago(it.mts || it.ts));
+            time.title = new Date((it.mts || it.ts) * 1000).toLocaleString();
+            var acts = el('div', 'clip-item-actions');
+
+            var copyBtn = el('button', 'clip-btn', '复制');
+            copyBtn.type = 'button';
+            var body = el('div', 'clip-text', it.text);
+            copyBtn.onclick = function () { copyText(it.text, copyBtn, body); };
+
+            var editBtn = el('button', 'clip-btn', '编辑');
+            editBtn.type = 'button';
+            editBtn.onclick = function () { startEdit(row, it); };
+
+            var delBtn = el('button', 'clip-btn danger', '删除');
+            delBtn.type = 'button';
+            delBtn.onclick = function () { armDelete(delBtn, it); };
+
+            acts.appendChild(copyBtn);
+            acts.appendChild(editBtn);
+            acts.appendChild(delBtn);
+            head.appendChild(time);
+            head.appendChild(acts);
+
+            row.appendChild(head);
+            row.appendChild(body);
+            return row;
+        }
+
+        // ---------- 编辑 ----------
+        function startEdit(row, it) {
+            editingId = it.id;
+            row.textContent = '';
+
+            var head = el('div', 'clip-item-head');
+            head.appendChild(el('span', 'clip-time', '正在编辑（最后保存的算数）'));
+            var area = document.createElement('textarea');
+            area.className = 'clip-edit-area';
+            area.rows = 3;
+            area.maxLength = newEl.maxLength;
+            area.value = it.text;
+
+            var bar = el('div', 'clip-edit-bar');
+            var cancel = el('button', 'clip-btn', '取消');
+            cancel.type = 'button';
+            var save = el('button', 'clip-btn', '保存');
+            save.type = 'button';
+            save.style.background = '#2563eb';
+            save.style.borderColor = '#2563eb';
+            save.style.color = '#fff';
+            bar.appendChild(cancel);
+            bar.appendChild(save);
+
+            var close = function () {
+                editingId = null;
+                render();
+            };
+            cancel.onclick = close;
+            save.onclick = function () {
+                var text = area.value.trim();
+                if (!text) { setMsg('内容不能为空'); area.focus(); return; }
+                save.disabled = true;
+                api('/api/clipboard/' + encodeURIComponent(it.id), {
+                    method: 'POST',
+                    body: JSON.stringify({ text: text })
+                }).then(function (d) {
+                    var idx = items.findIndex(function (x) { return x.id === it.id; });
+                    if (idx >= 0 && d.item) items[idx] = d.item;
+                    setMsg('');
+                    close();
+                }).catch(function (e) {
+                    setMsg(e.message);
+                    save.disabled = false;
+                });
+            };
+            area.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); save.click(); }
+                if (e.key === 'Escape') close();
+            });
+
+            row.appendChild(head);
+            row.appendChild(area);
+            row.appendChild(bar);
+            area.focus();
+            area.setSelectionRange(area.value.length, area.value.length);
+        }
+
+        // ---------- 删除（点两次，3 秒后自动收回，防手滑） ----------
+        function armDelete(btn, it) {
+            if (btn.dataset.armed === '1') {
+                btn.disabled = true;
+                api('/api/clipboard/' + encodeURIComponent(it.id), { method: 'DELETE' })
+                    .then(function () {
+                        items = items.filter(function (x) { return x.id !== it.id; });
+                        setMsg('');
+                        if (editingId === it.id) editingId = null;
+                        render();
+                    })
+                    .catch(function (e) { setMsg(e.message); btn.disabled = false; });
+                return;
+            }
+            btn.dataset.armed = '1';
+            btn.classList.add('armed');
+            btn.textContent = '再点一次';
+            setTimeout(function () {
+                if (!btn.isConnected) return;
+                btn.dataset.armed = '';
+                btn.classList.remove('armed');
+                btn.textContent = '删除';
+            }, 3000);
+        }
+
+        // ---------- 新增 ----------
+        function add() {
+            var text = newEl.value.trim();
+            if (!text || busyAdd) { if (!text) newEl.focus(); return; }
+            busyAdd = true;
+            addBtn.disabled = true;
+            api('/api/clipboard', { method: 'POST', body: JSON.stringify({ text: text }) })
+                .then(function (d) {
+                    newEl.value = '';
+                    if (d.item) items.unshift(d.item);
+                    setMsg('');
+                    render();
+                    newEl.focus();
+                })
+                .catch(function (e) { setMsg(e.message); })
+                .then(function () { busyAdd = false; addBtn.disabled = false; });
+        }
+
+        // ---------- 拉取（轮询 + 回到页面时） ----------
+        var loading = false;
+        function load() {
+            if (loading) return;
+            loading = true;
+            api('/api/clipboard').then(function (d) {
+                items = d.items || [];
+                if (d.ttl_hours) ttlEl.textContent = d.ttl_hours;
+                if (d.max_chars) newEl.maxLength = d.max_chars;
+                render();
+            }).catch(function () {
+                // 网络抖动不打扰用户，下一轮自己会好
+            }).then(function () { loading = false; });
+        }
+
+        addBtn.addEventListener('click', add);
+        newEl.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); add(); }
+        });
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) load();
+        });
+        window.addEventListener('focus', load);
+        setInterval(load, 6000);
+        load();
+    })();
     </script>
 </body>
 </html>

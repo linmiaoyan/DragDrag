@@ -1,0 +1,4 @@
+# 服务直接跑在 Linux 上，仓库与工作区统一 LF，
+# 避免 Windows 检出把 .sh 变成 CRLF 导致 bash 执行失败。
+* text=auto eol=lf
+*.png binary

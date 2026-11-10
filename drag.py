@@ -1,15 +1,46 @@
 import os
 import json
 import re
+import hmac
+import threading
+import time
+import uuid
 from flask import Flask, request, send_from_directory, jsonify, Response, make_response, render_template
 from werkzeug.utils import secure_filename
 import urllib.parse
 import sys
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DOWNLOAD_FOLDER = os.path.join(BASE_DIR, '../download')
+DOWNLOAD_FOLDER = '/mnt/data/dragdrag/download'
 SECTIONS_DATA_FILE = os.path.join(BASE_DIR, 'sections_data.json')
 HMDM_FILES_FOLDER = '/opt/hmdm/volumes/files'
+
+# ---------------------------------------------------------------
+# 删除权限
+#   「临时」组 = 默认分区（id 固定为 default），删除免密。
+#   其余分组删除文件 / 删除分区都要求管理员密码。
+#   口令来源（按优先级）：
+#     1) 环境变量 DRAGDRAG_ADMIN_PASSWORD
+#     2) 同目录 .admin_password 文件（不入库，权限 600）
+#     3) 都没配 -> 一律拒绝删除（fail-closed），不会退化成免密
+#   ⚠️ 仓库里不写死口令，部署时把真实口令放到上述任一处。（2026-11-10）
+#
+#   ⚠️ 判定只认 **分区 id**，不认名字 —— 名字可以随时改，
+#      否则把正式组改名叫「临时」就能绕过。（2026-10-19）
+# ---------------------------------------------------------------
+def _load_admin_password():
+    pw = os.environ.get('DRAGDRAG_ADMIN_PASSWORD', '').strip()
+    if pw:
+        return pw
+    try:
+        with open(os.path.join(BASE_DIR, '.admin_password'), 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except OSError:
+        return ''
+
+
+ADMIN_PASSWORD = _load_admin_password()
+TEMP_SECTION_ID = 'default'
 
 # 确保必要的目录存在
 if not os.path.exists(DOWNLOAD_FOLDER):
@@ -47,6 +78,61 @@ def save_sections_data(sections):
 # 初始化分区数据
 sections_data = load_sections_data()
 
+
+def is_temp_section(section):
+    """是不是「临时」组（默认分区）。None 一律按「不是临时组」处理。"""
+    return bool(section) and section.get('id') == TEMP_SECTION_ID
+
+
+def sections_containing(filename):
+    """列出所有包含该文件的分区（同一文件可能被拖拽登记在多个分区里）。"""
+    return [s for s in sections_data if filename in s.get('files', [])]
+
+
+def needs_admin_password(filename):
+    """删除这个文件要不要密码。
+
+    ⚠️ 判定依据是「文件实际归属哪些分区」，**不看前端传来的 sectionId** ——
+       否则构造一个 sectionId=default 的请求就能把正式组的文件删掉。
+       只要文件出现在任何一个非临时分区里，就必须过密码这一关。
+       文件不属于任何分区（孤儿）时也按需要密码处理，从严。
+    """
+    holders = sections_containing(filename)
+    if not holders:
+        return True
+    return any(not is_temp_section(s) for s in holders)
+
+
+def password_ok(supplied):
+    if not supplied:
+        return False
+    try:
+        return hmac.compare_digest(str(supplied).encode('utf-8'),
+                                   ADMIN_PASSWORD.encode('utf-8'))
+    except Exception:
+        return False
+
+
+def request_password():
+    """密码可放在 X-Admin-Password 头，也可放在 JSON/表单的 password 字段。"""
+    pw = request.headers.get('X-Admin-Password', '')
+    if not pw:
+        body = request.get_json(silent=True) or {}
+        if isinstance(body, dict):
+            pw = body.get('password') or ''
+        if not pw:
+            pw = request.form.get('password') or ''
+    return pw
+
+
+def password_error(message):
+    return jsonify({
+        "status": "error",
+        "code": "PASSWORD_REQUIRED",
+        "message": message,
+    }), 403
+
+
 def allowed_file(filename):
     return True
 
@@ -76,9 +162,176 @@ def unique_filename(desired_filename: str) -> str:
         counter += 1
     return final_filename
 
+# ---------------------------------------------------------------
+# 共享剪贴板（2026-10-26）
+#   页面最上方的一块公共便签：谁都可以加、改、删，用来临时贴一段文本。
+#   • 存 clipboard_data.json；读写加锁 + 原子替换（.tmp → os.replace）
+#   • 超过 TTL 的条目在每个请求里顺手清掉（默认 24 小时）
+#   • 单条长度、条目总数都有上限，防刷屏
+#   • 这里**不设密码**：它天生就是公开协作区，
+#     和「删除正式分组的文件要管理员密码」是两套东西，别混在一起
+# ---------------------------------------------------------------
+CLIPBOARD_DATA_FILE = os.path.join(BASE_DIR, 'clipboard_data.json')
+CLIPBOARD_TTL_HOURS = int(os.environ.get('DRAGDRAG_CLIPBOARD_TTL_HOURS', '24'))
+CLIPBOARD_MAX_ITEMS = int(os.environ.get('DRAGDRAG_CLIPBOARD_MAX_ITEMS', '30'))
+CLIPBOARD_MAX_CHARS = int(os.environ.get('DRAGDRAG_CLIPBOARD_MAX_CHARS', '4000'))
+_clipboard_lock = threading.Lock()
+
+
+def _clip_now():
+    return int(time.time())
+
+
+def _clip_load():
+    """读盘。文件坏了就当空，不要因为一条坏数据把整页拖死。"""
+    if os.path.exists(CLIPBOARD_DATA_FILE):
+        try:
+            with open(CLIPBOARD_DATA_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return [it for it in data if isinstance(it, dict) and it.get('id')]
+            if isinstance(data, dict) and isinstance(data.get('items'), list):
+                return [it for it in data['items'] if isinstance(it, dict) and it.get('id')]
+        except Exception as e:
+            print(f"加载剪贴板失败: {e}")
+    return []
+
+
+def _clip_save(items):
+    """原子写：先写 .tmp 再 os.replace，避免写到一半断电/并发读到半个文件。"""
+    tmp = CLIPBOARD_DATA_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, CLIPBOARD_DATA_FILE)
+
+
+def _clip_prune(items):
+    """丢掉过期的，返回 (留下的, 有没有变)。"""
+    deadline = _clip_now() - CLIPBOARD_TTL_HOURS * 3600
+    kept = [it for it in items if int(it.get('ts') or 0) >= deadline]
+    return kept, len(kept) != len(items)
+
+
+def _clip_clean_text(raw):
+    """统一换行、去首尾空白，顺便挡掉 '\x00' 这类会让 JS 出问题的字符。"""
+    text = (raw or '').replace('\r\n', '\n').replace('\r', '\n').replace('\x00', '')
+    return text.strip()
+
+
+def _clip_public(item):
+    """只吐前端要用的字段，别把内部结构漏出去。"""
+    return {
+        'id': item['id'],
+        'text': item.get('text', ''),
+        'ts': int(item.get('ts') or 0),
+        'mts': int(item.get('mts') or item.get('ts') or 0),
+    }
+
+
+def _clip_read_all():
+    """加锁读 + 清过期。返回快照（不加锁的裸数据别在外面用）。"""
+    with _clipboard_lock:
+        items = _clip_load()
+        items, changed = _clip_prune(items)
+        if len(items) > CLIPBOARD_MAX_ITEMS:
+            items = items[:CLIPBOARD_MAX_ITEMS]
+            changed = True
+        if changed:
+            try:
+                _clip_save(items)
+            except Exception as e:
+                print(f"清理剪贴板失败: {e}")
+        return items
+
+
+def clipboard_error(message, code=400, http=400):
+    return jsonify({"status": "error", "code": code, "message": message}), http
+
+
+def _clip_body():
+    """前端只发 JSON，但顺手兼容表单，省得调接口时踩坑。"""
+    data = request.get_json(silent=True)
+    if isinstance(data, dict):
+        return data
+    return request.form.to_dict() or {}
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/api/clipboard', methods=['GET'])
+def clipboard_list():
+    items = _clip_read_all()
+    return jsonify({
+        "status": "ok",
+        "items": [_clip_public(it) for it in items],
+        "ttl_hours": CLIPBOARD_TTL_HOURS,
+        "max_items": CLIPBOARD_MAX_ITEMS,
+        "max_chars": CLIPBOARD_MAX_CHARS,
+        "server_ts": _clip_now(),
+    })
+
+
+@app.route('/api/clipboard', methods=['POST'])
+def clipboard_add():
+    text = _clip_clean_text(_clip_body().get('text'))
+    if not text:
+        return clipboard_error('内容不能为空', 'EMPTY_TEXT')
+    if len(text) > CLIPBOARD_MAX_CHARS:
+        return clipboard_error(f'太长了，最多 {CLIPBOARD_MAX_CHARS} 个字符', 'TOO_LONG')
+    with _clipboard_lock:
+        items = _clip_load()
+        items, _ = _clip_prune(items)
+        if len(items) >= CLIPBOARD_MAX_ITEMS:
+            return clipboard_error(
+                f'剪贴板已经满 {CLIPBOARD_MAX_ITEMS} 条了，先删掉几条旧的', 'FULL', http=429)
+        now = _clip_now()
+        item = {'id': uuid.uuid4().hex[:12], 'text': text, 'ts': now, 'mts': now}
+        items.insert(0, item)          # 新的在最前
+        try:
+            _clip_save(items)
+        except Exception as e:
+            return clipboard_error(f'保存失败: {e}', 'SAVE_FAILED', 500)
+    return jsonify({"status": "ok", "item": _clip_public(item)}), 201
+
+
+@app.route('/api/clipboard/<cid>', methods=['POST', 'PUT', 'PATCH'])
+def clipboard_update(cid):
+    text = _clip_clean_text(_clip_body().get('text'))
+    if not text:
+        return clipboard_error('内容不能为空', 'EMPTY_TEXT')
+    if len(text) > CLIPBOARD_MAX_CHARS:
+        return clipboard_error(f'太长了，最多 {CLIPBOARD_MAX_CHARS} 个字符', 'TOO_LONG')
+    with _clipboard_lock:
+        items, _ = _clip_prune(_clip_load())
+        hit = next((it for it in items if it.get('id') == cid), None)
+        if not hit:
+            # 过期被清掉也会走到这里，提示「已被清掉」比「不存在」更好懂
+            return clipboard_error('这条已经不在剪贴板里了（可能已过期或被删）', 'NOT_FOUND', 404)
+        hit['text'] = text
+        hit['mts'] = _clip_now()
+        try:
+            _clip_save(items)
+        except Exception as e:
+            return clipboard_error(f'保存失败: {e}', 'SAVE_FAILED', 500)
+    return jsonify({"status": "ok", "item": _clip_public(hit)})
+
+
+@app.route('/api/clipboard/<cid>', methods=['DELETE'])
+def clipboard_delete(cid):
+    with _clipboard_lock:
+        items = _clip_load()
+        left = [it for it in items if it.get('id') != cid]
+        if len(left) == len(items):
+            return clipboard_error('这条已经不在剪贴板里了', 'NOT_FOUND', 404)
+        try:
+            _clip_save(left)
+        except Exception as e:
+            return clipboard_error(f'保存失败: {e}', 'SAVE_FAILED', 500)
+    return jsonify({"status": "ok", "deleted": cid})
+
 
 @app.route('/files', methods=['GET'])
 def list_files():
@@ -125,7 +378,19 @@ def update_sections():
             if not any(s['id'] == 'default' for s in new_sections):
                 default_section = {"id": "default", "name": "默认分区", "files": []}
                 new_sections.insert(0, default_section)
-            
+
+            # —— 权限：删掉「临时」以外的分区要管理员密码 ——
+            # 拖拽移动文件、新建分区、重命名组都会走这个接口，
+            # 只有「有分组真的消失了」才拦，不影响正常操作。
+            old_ids = {s.get('id') for s in sections_data}
+            new_ids = {s.get('id') for s in new_sections}
+            removed = [s for s in sections_data if s.get('id') in (old_ids - new_ids)]
+            removed_protected = [s for s in removed if not is_temp_section(s)]
+            if removed_protected:
+                names = '、'.join((s.get('name') or s.get('id')) for s in removed_protected)
+                if not password_ok(request_password()):
+                    return password_error(f"删除分区「{names}」需要管理员密码")
+
             sections_data = new_sections
             if save_sections_data(sections_data):
                 return jsonify({"status": "success"})
@@ -323,9 +588,17 @@ def download_file(filename):
 
 @app.route('/delete/<filename>', methods=['POST'])
 def delete_file(filename):
+    global sections_data
     # 解码URL编码的文件名
     decoded_filename = urllib.parse.unquote(filename, encoding='utf-8')
-    
+
+    # —— 权限：只有「临时」组里的文件免密，其余要管理员密码 ——
+    if needs_admin_password(decoded_filename):
+        holders = sections_containing(decoded_filename)
+        label = '、'.join((s.get('name') or s.get('id')) for s in holders) or '未知分区'
+        if not password_ok(request_password()):
+            return password_error(f"「{label}」不是临时组，删除需要管理员密码")
+
     # 尝试找到并删除文件
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], decoded_filename)
     
@@ -345,7 +618,6 @@ def delete_file(filename):
             os.remove(file_path)
             
             # 从所有分区中移除该文件（使用原始解码后的文件名）
-            global sections_data
             for section in sections_data:
                 if decoded_filename in section['files']:
                     section['files'].remove(decoded_filename)
@@ -375,7 +647,7 @@ def serve_files(filename):
     return send_from_directory(HMDM_FILES_FOLDER, safe_name, as_attachment=False)
 
 def main():
-    app.run(host='0.0.0.0', port=80, debug=True)
+    app.run(host='0.0.0.0', port=30001, debug=True)
 
 if __name__ == '__main__':
     main()
